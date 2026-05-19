@@ -1,0 +1,53 @@
+{
+    "name": "ytm-tunnel-desktop",
+    "version": "1.0.0",
+    "description": "Dedicated YouTube Music desktop client with app-local SOCKS5 proxy",
+    "main": "main.js",
+    "author": "",
+    "license": "MIT",
+    "private": true,
+    "scripts": {
+        "start": "electron .",
+        "dev": "cross-env NODE_ENV=development electron .",
+        "start:proxy": "cross-env YTM_USE_PROXY=true electron .",
+        "start:noproxy": "cross-env YTM_USE_PROXY=false electron .",
+        "start:with-singbox": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-with-singbox.ps1",
+        "convert:wg": "node ./scripts/convert-wg-to-singbox.js",
+        "build": "electron-builder",
+        "build:win": "electron-builder --win nsis"
+    },
+    "build": {
+        "appId": "com.example.ytmtunneldesktop",
+        "productName": "YTM Tunnel Desktop",
+        "asar": true,
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.js",
+            "preload.js",
+            "package.json"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "artifactName": "${productName}-${version}-Setup-${arch}.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    },
+    "devDependencies": {
+        "cross-env": "^7.0.3",
+        "electron": "^42.1.0",
+        "electron-builder": "^26.0.12"
+    }
+}

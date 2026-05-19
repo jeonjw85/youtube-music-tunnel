@@ -1,0 +1,42 @@
+{
+    "log": {
+        "level": "info",
+        "timestamp": true
+    },
+    "inbounds": [
+        {
+            "type": "socks",
+            "tag": "socks-in",
+            "listen": "127.0.0.1",
+            "listen_port": 1080
+        }
+    ],
+    "endpoints": [
+        {
+            "type": "wireguard",
+            "tag": "mullvad-wg",
+            "address": ["10.64.0.2/32"],
+            "private_key": "YOUR_PRIVATE_KEY_FROM_MULLVAD_CONF",
+            "mtu": 1280,
+            "peers": [
+                {
+                    "address": "YOUR_MULLVAD_ENDPOINT_HOST",
+                    "port": 51820,
+                    "public_key": "YOUR_PEER_PUBLIC_KEY_FROM_MULLVAD_CONF",
+                    "allowed_ips": ["0.0.0.0/0", "::/0"],
+                    "reserved": [0, 0, 0]
+                }
+            ]
+        }
+    ],
+    "outbounds": [
+        {
+            "type": "direct",
+            "tag": "direct"
+        }
+    ],
+    "route": {
+        "auto_detect_interface": true,
+        "final": "mullvad-wg"
+    }
+}
