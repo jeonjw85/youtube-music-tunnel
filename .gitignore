@@ -3,3 +3,4 @@ dist/
 *.log
 sing-box/config.json
 package-lock.json
+*.txt

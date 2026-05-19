@@ -1,1 +1,0 @@
-[31mFATAL[0m[0000] decode config at ./sing-box/config.json: inbounds[0]: legacy inbound fields are deprecated in sing-box 1.11.0 and removed in sing-box 1.13.0, checkout migration: https://sing-box.sagernet.org/migration/#migrate-legacy-inbound-fields-to-rule-actions
