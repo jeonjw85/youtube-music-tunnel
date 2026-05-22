@@ -13,7 +13,7 @@ const path = require("path");
 const YTM_URL = "https://music.youtube.com/";
 const PROXY = process.env.YTM_PROXY || "socks5://127.0.0.1:1080";
 const USE_PROXY = process.env.YTM_USE_PROXY !== "false";
-const MINIMIZE_TO_TRAY = process.env.YTM_MINIMIZE_TO_TRAY !== "false";
+const MINIMIZE_TO_TRAY = process.env.YTM_MINIMIZE_TO_TRAY === "true";
 const START_HIDDEN = process.env.YTM_START_HIDDEN === "true";
 
 // Apply proxy only to this Electron/Chromium process.
@@ -25,6 +25,18 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let hasShownProxyError = false;
+
+function relaunchWithoutProxy() {
+    // Relaunch with proxy explicitly disabled so command-line proxy switch is not applied.
+    const env = {
+        ...process.env,
+        YTM_USE_PROXY: "false",
+    };
+
+    app.relaunch({ env });
+    isQuitting = true;
+    app.quit();
+}
 
 if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -108,9 +120,13 @@ function createMainWindow() {
             dialog
                 .showMessageBox({
                     type: "error",
-                    buttons: ["Retry", "Quit"],
+                    buttons: [
+                        "Retry",
+                        "Restart without proxy (no tunnel)",
+                        "Quit",
+                    ],
                     defaultId: 0,
-                    cancelId: 1,
+                    cancelId: 2,
                     title: "SOCKS5 proxy not reachable",
                     message: `Cannot connect to ${PROXY}`,
                     detail:
@@ -125,6 +141,11 @@ function createMainWindow() {
                     if (response === 0) {
                         hasShownProxyError = false;
                         mainWindow.reload();
+                        return;
+                    }
+
+                    if (response === 1) {
+                        relaunchWithoutProxy();
                         return;
                     }
 
@@ -151,13 +172,18 @@ function createMainWindow() {
 }
 
 function getTrayIcon() {
-    // Minimal built-in icon fallback for first run; replace with your own .ico for production branding.
-    const fallbackPng =
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2p6YcAAAAASUVORK5CYII=";
-    const icon = nativeImage
-        .createFromDataURL(fallbackPng)
+    const exeIcon = nativeImage.createFromPath(process.execPath);
+    if (!exeIcon.isEmpty()) {
+        return exeIcon.resize({ width: 16, height: 16 });
+    }
+
+    const fallbackSvg =
+        "<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'><rect x='4' y='4' width='56' height='56' rx='14' fill='%231d4ed8'/><polygon points='26,20 26,44 46,32' fill='white'/></svg>";
+    return nativeImage
+        .createFromDataURL(
+            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fallbackSvg)}`,
+        )
         .resize({ width: 16, height: 16 });
-    return icon;
 }
 
 function showMainWindow() {
@@ -289,7 +315,9 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
 
     createMainWindow();
-    createTray();
+    if (MINIMIZE_TO_TRAY) {
+        createTray();
+    }
     registerMediaKeys();
 
     if (START_HIDDEN && MINIMIZE_TO_TRAY && mainWindow) {

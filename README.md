@@ -104,6 +104,7 @@ npm run build:win
 ## 참고 사항
 
 - sing-box(127.0.0.1:1080)가 내려가 있으면 앱에서 원인 안내 프록시 오류 다이얼로그를 표시합니다.
+- 기본 동작은 최소화 시 작업 표시줄 유지입니다. 트레이 최소화를 원하면 실행 전에 환경 변수 YTM_MINIMIZE_TO_TRAY=true를 설정하세요.
 - sing-box/config.json에는 개인 키가 포함되므로 버전 관리에 포함하지 마세요.
 - 1080 포트가 이미 사용 중이면 sing-box 설정의 listen_port를 바꾸고 YTM_PROXY도 동일하게 맞추세요.
 - 이 프로젝트는 sing-box 1.13+ endpoint 스키마를 사용합니다(legacy wireguard outbound/sniff 필드 미사용)
