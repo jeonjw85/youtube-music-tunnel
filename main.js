@@ -7,6 +7,7 @@ const {
     shell,
     globalShortcut,
     dialog,
+    ipcMain,
 } = require("electron");
 const path = require("path");
 
@@ -23,8 +24,96 @@ if (USE_PROXY && PROXY) {
 
 let mainWindow = null;
 let tray = null;
+let eqWindow = null;
 let isQuitting = false;
 let hasShownProxyError = false;
+// 10-band
+const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+let eqGains = new Array(EQ_FREQUENCIES.length).fill(0);
+
+function buildEqScript(gains) {
+    return `
+(() => {
+  const freqs = ${JSON.stringify(EQ_FREQUENCIES)};
+  const gains = ${JSON.stringify(gains)};
+
+  // Re-use existing context/filters if already injected
+  if (window.__ytmEqFilters) {
+    window.__ytmEqFilters.forEach((f, i) => { f.gain.value = gains[i]; });
+    return;
+  }
+
+  const mediaEl = document.querySelector('video') || document.querySelector('audio');
+  if (!mediaEl) return;
+
+  const ctx = new AudioContext();
+  const source = ctx.createMediaElementSource(mediaEl);
+
+  const filters = freqs.map((freq, i) => {
+    const filter = ctx.createBiquadFilter();
+    filter.type = i === 0 ? 'lowshelf' : i === freqs.length - 1 ? 'highshelf' : 'peaking';
+    filter.frequency.value = freq;
+    filter.Q.value = 1.4;
+    filter.gain.value = gains[i];
+    return filter;
+  });
+
+  // Chain filters
+  source.connect(filters[0]);
+  for (let i = 0; i < filters.length - 1; i++) {
+    filters[i].connect(filters[i + 1]);
+  }
+  filters[filters.length - 1].connect(ctx.destination);
+
+  window.__ytmEqFilters = filters;
+})();
+`;
+}
+
+function applyEqToWindow() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents
+        .executeJavaScript(buildEqScript(eqGains), true)
+        .catch(() => {});
+}
+
+ipcMain.on("eq:set-gains", (_event, gains) => {
+    if (!Array.isArray(gains) || gains.length !== EQ_FREQUENCIES.length) return;
+    eqGains = gains.map((v) => Math.max(-12, Math.min(12, Number(v) || 0)));
+    applyEqToWindow();
+});
+
+ipcMain.handle("eq:get-gains", () => eqGains);
+
+function openEqWindow() {
+    if (eqWindow && !eqWindow.isDestroyed()) {
+        eqWindow.focus();
+        return;
+    }
+
+    eqWindow = new BrowserWindow({
+        width: 420,
+        height: 280,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        title: "Equalizer",
+        backgroundColor: "#111111",
+        parent: mainWindow || undefined,
+        webPreferences: {
+            preload: path.join(__dirname, "preload-eq.js"),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+        },
+    });
+
+    eqWindow.removeMenu();
+    eqWindow.loadFile("eq.html");
+    eqWindow.on("closed", () => {
+        eqWindow = null;
+    });
+}
 
 function relaunchWithoutProxy() {
     // Relaunch with proxy explicitly disabled so command-line proxy switch is not applied.
@@ -96,6 +185,12 @@ function createMainWindow() {
     });
 
     mainWindow.loadURL(YTM_URL);
+
+    mainWindow.webContents.on("did-finish-load", () => {
+        if (eqGains.some((g) => g !== 0)) {
+            setTimeout(applyEqToWindow, 1500);
+        }
+    });
 
     // Give a clear, actionable message when the local SOCKS5 endpoint is down.
     mainWindow.webContents.on(
@@ -246,6 +341,9 @@ function registerMediaKeys() {
             executePlayerAction(shortcut.script);
         });
     }
+
+    // Open EQ window with Ctrl+E
+    globalShortcut.register("CommandOrControl+E", openEqWindow);
 }
 
 function createTray() {
@@ -289,6 +387,13 @@ function createTray() {
           })();
         `);
             },
+        },
+        {
+            type: "separator",
+        },
+        {
+            label: "Equalizer",
+            click: openEqWindow,
         },
         {
             type: "separator",

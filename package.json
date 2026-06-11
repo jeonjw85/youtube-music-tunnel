@@ -26,6 +26,8 @@
         "files": [
             "main.js",
             "preload.js",
+            "preload-eq.js",
+            "eq.html",
             "package.json"
         ],
         "win": {

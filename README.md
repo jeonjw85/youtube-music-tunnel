@@ -1,114 +1,264 @@
 # YTM Tunnel Desktop
 
-앱 내부 전용 SOCKS5 프록시를 지원하는 Electron 기반 YouTube Music 전용 데스크톱 클라이언트
+An Electron-based YouTube Music desktop client with an app-local SOCKS5 tunnel.
 
-## 목표
+YTM Tunnel Desktop is designed for cases where YouTube Music should use a VPN/proxy tunnel, but the rest of Windows should keep using the normal network path. The app applies the proxy only to its own Electron/Chromium process and does not change Windows system proxy settings.
 
-프록시/VPN 터널은 이 애플리케이션에서만 사용합니다.
-Windows 전체 시스템 트래픽은 변경되지 않습니다.
+## What It Does
 
-## 아키텍처
+- Opens YouTube Music in a dedicated desktop window.
+- Routes only this app through a local SOCKS5 proxy, by default `socks5://127.0.0.1:1080`.
+- Uses `sing-box` with a WireGuard endpoint for the tunnel.
+- Keeps system-wide Windows traffic untouched.
+- Includes tray controls, media key support, and a simple equalizer window.
 
-- Electron 앱 -> 127.0.0.1:1080 SOCKS5
-- sing-box -> WireGuard
-- 시스템 프록시 설정 변경 없음
+## Architecture
 
-Electron 앱은 아래 코드로 자신의 Chromium 프로세스에만 프록시를 적용합니다:
+```text
+YTM Tunnel Desktop (Electron)
+  -> 127.0.0.1:1080 SOCKS5
+  -> sing-box
+  -> WireGuard endpoint
+```
 
-app.commandLine.appendSwitch("proxy-server", proxy)
+The Electron app applies the proxy to its own Chromium process with:
 
-## 빠른 실행 (처음 1회 포함)
+```js
+app.commandLine.appendSwitch("proxy-server", proxy);
+```
 
-1. 의존성 설치
+No Windows system proxy setting is modified.
+
+## Requirements
+
+- Windows
+- Node.js and npm
+- `sing-box` installed and available on `PATH`
+  - Recommended install command:
+
+```powershell
+winget install SagerNet.sing-box
+```
+
+- A WireGuard configuration file, for example one exported from Mullvad VPN
+
+## Quick Start
+
+1. Install dependencies:
 
 ```powershell
 npm install
 ```
 
-2. Mullvad WireGuard conf를 sing-box 설정으로 변환
+2. Convert a Mullvad/WireGuard `.conf` file into a `sing-box` config:
 
 ```powershell
 npm run convert:wg -- --input "C:/Users/your-user/Downloads/your-mullvad.conf" --output "./sing-box/config.json"
 ```
 
-3. sing-box + Electron 앱을 한 번에 실행
+3. Start `sing-box` and the Electron app together:
 
 ```powershell
 npm run start:with-singbox
 ```
 
-중요:
+Keep this terminal window open while using the app. Closing it also stops `sing-box`.
 
-- 이 실행 창을 닫으면 sing-box도 함께 종료됩니다.
-- 실행 중에는 창을 닫지 말고 최소화해서 사용하세요.
-
-프록시 없이 앱만 확인할 때:
+To run the app without the proxy for testing:
 
 ```powershell
 npm run start:noproxy
 ```
 
-## 1) Mullvad WireGuard 값 준비
+## WireGuard Configuration
 
-Mullvad VPN 사용 시 .conf 파일에서 아래 값을 준비
+When using Mullvad VPN or another WireGuard provider, the converter reads these values from the `.conf` file:
 
-- Interface.PrivateKey
-- Interface.Address (IPv4 /32 하나 사용)
-- Peer.PublicKey
-- Peer.Endpoint 호스트와 포트
+- `Interface.PrivateKey`
+- `Interface.Address`
+- `Peer.PublicKey`
+- `Peer.Endpoint`
+- `Peer.AllowedIPs`
+- `Peer.Reserved` or `Interface.Reserved`, if present
+- `Peer.PresharedKey`, if present
 
-## 2) sing-box 런타임 설정 생성
+The generated runtime file is written to:
 
-권장 방법(자동 변환):
+```text
+sing-box/config.json
+```
 
+This file contains private key material. Do not commit it to version control.
+
+## Creating `sing-box/config.json`
+
+### Recommended: Automatic Conversion
+
+```powershell
 npm run convert:wg -- --input "C:/Users/your-user/Downloads/your-mullvad.conf" --output "./sing-box/config.json"
+```
 
-수동 방법(템플릿 직접 편집):
+Useful converter options:
 
-1. 파일 복사:
-    - sing-box/config.template.json -> sing-box/config.json
-2. sing-box/config.json의 placeholder 값 채우기
-    - endpoints[0].peers[0].address (Endpoint host)
-    - endpoints[0].peers[0].port (Endpoint port)
-    - endpoints[0].address (Interface Address)
-    - endpoints[0].private_key
-    - endpoints[0].peers[0].public_key
+- `--listen-host` default: `127.0.0.1`
+- `--listen-port` default: `1080`
+- `--mtu` default: `1280`
 
-## 3) 실행
+Example with a custom local SOCKS5 port:
 
-의존성 설치:
+```powershell
+npm run convert:wg -- --input "C:/Users/your-user/Downloads/your-mullvad.conf" --output "./sing-box/config.json" --listen-port 1081
+```
 
-npm install
+### Manual: Edit the Template
 
-프록시 비활성화로 앱 실행(테스트용):
+1. Copy the template:
 
+```powershell
+Copy-Item ./sing-box/config.template.json ./sing-box/config.json
+```
+
+2. Fill in the WireGuard placeholders in `sing-box/config.json`:
+
+- `endpoints[0].peers[0].address` - endpoint host
+- `endpoints[0].peers[0].port` - endpoint port
+- `endpoints[0].address` - interface address list
+- `endpoints[0].private_key`
+- `endpoints[0].peers[0].public_key`
+- `endpoints[0].peers[0].allowed_ips`
+- `endpoints[0].peers[0].reserved`, if your provider requires it
+
+## Running
+
+Run without the proxy:
+
+```powershell
 npm run start:noproxy
+```
 
-sing-box를 수동 실행한 뒤 앱 실행:
+Run with an already-running SOCKS5 proxy:
 
-1. 터미널 A:
-   sing-box run -c ./sing-box/config.json
-2. 터미널 B:
-   npm run start:proxy
+```powershell
+npm run start:proxy
+```
 
-한 번에 같이 실행(권장):
+Run `sing-box` manually in one terminal, then start the app in another:
 
+```powershell
+sing-box run -c ./sing-box/config.json
+```
+
+```powershell
+npm run start:proxy
+```
+
+Run `sing-box` and the app together:
+
+```powershell
 npm run start:with-singbox
+```
 
-## 4) Windows 설치 파일 빌드
+The combined start script checks the `sing-box` config, starts `sing-box`, waits until the SOCKS5 endpoint is reachable, starts the Electron app, and stops `sing-box` when the app exits.
 
+## Environment Variables
+
+- `YTM_USE_PROXY`
+  - `true` or unset: enable the app-local proxy.
+  - `false`: disable the proxy.
+- `YTM_PROXY`
+  - Proxy URL used by Electron.
+  - Default: `socks5://127.0.0.1:1080`
+- `YTM_MINIMIZE_TO_TRAY`
+  - `true`: closing the window hides it to the tray.
+  - unset/other: closing behaves normally.
+- `YTM_START_HIDDEN`
+  - `true`: start hidden and rely on the tray.
+
+Example:
+
+```powershell
+$env:YTM_PROXY="socks5://127.0.0.1:1081"
+npm run start:proxy
+```
+
+If you change the `sing-box` `listen_port`, set `YTM_PROXY` to the same host and port.
+
+## App Controls
+
+- Media keys:
+  - Play/Pause
+  - Next track
+  - Previous track
+- `Ctrl+E`: open the equalizer window.
+- Tray menu:
+  - Show
+  - Play/Pause
+  - Next
+  - Previous
+  - Equalizer
+  - Quit
+
+Non-YouTube-Music links are opened in the external browser.
+
+## Building the Windows Installer
+
+```powershell
 npm run build:win
+```
 
-결과물은 dist/ 디렉터리에 생성됩니다.
+Build artifacts are written to:
 
-## 참고 사항
+```text
+dist/
+```
 
-- sing-box(127.0.0.1:1080)가 내려가 있으면 앱에서 원인 안내 프록시 오류 다이얼로그를 표시합니다.
-- 기본 동작은 최소화 시 작업 표시줄 유지입니다. 트레이 최소화를 원하면 실행 전에 환경 변수 YTM_MINIMIZE_TO_TRAY=true를 설정하세요.
-- sing-box/config.json에는 개인 키가 포함되므로 버전 관리에 포함하지 마세요.
-- 1080 포트가 이미 사용 중이면 sing-box 설정의 listen_port를 바꾸고 YTM_PROXY도 동일하게 맞추세요.
-- 이 프로젝트는 sing-box 1.13+ endpoint 스키마를 사용합니다(legacy wireguard outbound/sniff 필드 미사용)
-- 변환 스크립트 옵션:
-    - --listen-host (기본값: 127.0.0.1)
-    - --listen-port (기본값: 1080)
-    - --mtu (기본값: 1280)
+The Windows build uses `electron-builder` with an NSIS installer target.
+
+## Troubleshooting
+
+### `sing-box executable not found`
+
+Install `sing-box`:
+
+```powershell
+winget install SagerNet.sing-box
+```
+
+Or pass the executable path directly to the helper script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-with-singbox.ps1 -SingBoxExe "C:/path/to/sing-box.exe"
+```
+
+### `SOCKS5 proxy not reachable`
+
+The app shows a proxy error dialog when proxy mode is enabled but `127.0.0.1:1080` is not reachable.
+
+Check that:
+
+- `sing-box/config.json` exists.
+- `sing-box check -c ./sing-box/config.json` succeeds.
+- No other process is already using the SOCKS5 port.
+- `YTM_PROXY` matches the `sing-box` listen host and port.
+
+### Port `1080` Is Already In Use
+
+Generate a config with another port:
+
+```powershell
+npm run convert:wg -- --input "C:/Users/your-user/Downloads/your-mullvad.conf" --output "./sing-box/config.json" --listen-port 1081
+```
+
+Then run with the matching proxy:
+
+```powershell
+$env:YTM_PROXY="socks5://127.0.0.1:1081"
+npm run start:with-singbox
+```
+
+## Notes
+
+- `sing-box/config.json` is a local runtime file and may contain secrets.
+- This project uses the `sing-box` 1.13+ endpoint schema.
+- Legacy WireGuard outbound/sniff fields are not used.
+- The app is intentionally scoped to YouTube Music and app-local tunneling.

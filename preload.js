@@ -1,4 +1,4 @@
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 // Expose a tiny, read-only surface for diagnostics without enabling Node in the page.
 contextBridge.exposeInMainWorld("ytmDesktop", {

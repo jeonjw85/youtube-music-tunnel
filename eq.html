@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+        />
+        <title>Equalizer</title>
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background: #111;
+                color: #eee;
+                font-family: "Segoe UI", system-ui, sans-serif;
+                font-size: 12px;
+                user-select: none;
+                padding: 16px 12px 12px;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            h1 {
+                font-size: 13px;
+                font-weight: 600;
+                color: #fff;
+                letter-spacing: 0.05em;
+                text-align: center;
+            }
+
+            .bands {
+                display: flex;
+                gap: 6px;
+                flex: 1;
+                align-items: flex-end;
+            }
+
+            .band {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                flex: 1;
+            }
+
+            .band .db-label {
+                font-size: 10px;
+                color: #aaa;
+                height: 16px;
+                line-height: 16px;
+            }
+
+            .band input[type="range"] {
+                writing-mode: vertical-lr;
+                direction: rtl;
+                width: 28px;
+                height: 140px;
+                -webkit-appearance: slider-vertical;
+                appearance: slider-vertical;
+                cursor: pointer;
+                accent-color: #ff0000;
+            }
+
+            .band .freq-label {
+                font-size: 10px;
+                color: #888;
+                text-align: center;
+                white-space: nowrap;
+            }
+
+            .actions {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+
+            button {
+                background: #222;
+                color: #ccc;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 5px 12px;
+                font-size: 11px;
+                cursor: pointer;
+                transition: background 0.15s;
+            }
+
+            button:hover {
+                background: #333;
+                color: #fff;
+            }
+
+            button.primary {
+                background: #c00;
+                border-color: #900;
+                color: #fff;
+            }
+            button.primary:hover {
+                background: #e00;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Equalizer</h1>
+        <div class="bands" id="bands"></div>
+        <div class="actions">
+            <button id="reset">Reset</button>
+            <button class="primary" id="apply">Apply</button>
+        </div>
+
+        <script>
+            const BANDS = [
+                { freq: "32", label: "32Hz" },
+                { freq: "64", label: "64Hz" },
+                { freq: "125", label: "125Hz" },
+                { freq: "250", label: "250Hz" },
+                { freq: "500", label: "500Hz" },
+                { freq: "1k", label: "1kHz" },
+                { freq: "2k", label: "2kHz" },
+                { freq: "4k", label: "4kHz" },
+                { freq: "8k", label: "8kHz" },
+                { freq: "16k", label: "16kHz" },
+            ];
+
+            const MIN_DB = -12;
+            const MAX_DB = 12;
+
+            const container = document.getElementById("bands");
+            const sliders = [];
+
+            BANDS.forEach((band, i) => {
+                const div = document.createElement("div");
+                div.className = "band";
+
+                const dbLabel = document.createElement("div");
+                dbLabel.className = "db-label";
+                dbLabel.textContent = "0 dB";
+
+                const input = document.createElement("input");
+                input.type = "range";
+                input.min = MIN_DB;
+                input.max = MAX_DB;
+                input.step = 0.5;
+                input.value = 0;
+
+                input.addEventListener("input", () => {
+                    const v = parseFloat(input.value);
+                    dbLabel.textContent =
+                        (v >= 0 ? "+" : "") + v.toFixed(1) + " dB";
+                });
+
+                const freqLabel = document.createElement("div");
+                freqLabel.className = "freq-label";
+                freqLabel.textContent = band.label;
+
+                div.appendChild(dbLabel);
+                div.appendChild(input);
+                div.appendChild(freqLabel);
+                container.appendChild(div);
+                sliders.push(input);
+            });
+
+            function getGains() {
+                return sliders.map((s) => parseFloat(s.value));
+            }
+
+            function applyEQ() {
+                window.eqBridge.setGains(getGains());
+            }
+
+            document.getElementById("apply").addEventListener("click", applyEQ);
+
+            document.getElementById("reset").addEventListener("click", () => {
+                sliders.forEach((s) => {
+                    s.value = 0;
+                    s.dispatchEvent(new Event("input"));
+                });
+                applyEQ();
+            });
+
+            // Load persisted gains on open
+            window.addEventListener("DOMContentLoaded", () => {});
+            (async () => {
+                const saved = await window.eqBridge.getGains();
+                if (saved && saved.length === sliders.length) {
+                    saved.forEach((v, i) => {
+                        sliders[i].value = v;
+                        sliders[i].dispatchEvent(new Event("input"));
+                    });
+                }
+            })();
+        </script>
+    </body>
+</html>
