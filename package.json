@@ -3,7 +3,7 @@
     "version": "0.1.1",
     "description": "Dedicated YouTube Music desktop client with app-local SOCKS5 proxy",
     "main": "main.js",
-    "author": "",
+    "author": "Jeongwan Jeon <jjw@jjw.kr>",
     "license": "MIT",
     "private": true,
     "scripts": {
