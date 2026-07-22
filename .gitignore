@@ -1,6 +1,9 @@
 node_modules/
 dist/
+vendor/
 *.log
-sing-box/config.json
+sing-box/config*.json
+sing-box/config.json.bak
+!sing-box/config.template.json
 package-lock.json
 *.txt

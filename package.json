@@ -1,6 +1,6 @@
 {
     "name": "ytm-tunnel-desktop",
-    "version": "1.0.0",
+    "version": "0.1.1",
     "description": "Dedicated YouTube Music desktop client with app-local SOCKS5 proxy",
     "main": "main.js",
     "author": "",
@@ -9,12 +9,12 @@
     "scripts": {
         "start": "electron .",
         "dev": "cross-env NODE_ENV=development electron .",
-        "start:proxy": "cross-env YTM_USE_PROXY=true electron .",
         "start:noproxy": "cross-env YTM_USE_PROXY=false electron .",
-        "start:with-singbox": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-with-singbox.ps1",
         "convert:wg": "node ./scripts/convert-wg-to-singbox.js",
-        "build": "electron-builder",
-        "build:win": "electron-builder --win nsis"
+        "vendor:singbox": "node ./scripts/download-singbox.js",
+        "test:tunnel": "node ./scripts/test-tunnel.js",
+        "build": "npm run vendor:singbox && electron-builder",
+        "build:win": "npm run vendor:singbox && electron-builder --win nsis"
     },
     "build": {
         "appId": "com.example.ytmtunneldesktop",
@@ -25,10 +25,21 @@
         },
         "files": [
             "main.js",
+            "singbox.js",
+            "wg-convert.js",
             "preload.js",
             "preload-eq.js",
             "eq.html",
             "package.json"
+        ],
+        "extraResources": [
+            {
+                "from": "vendor/sing-box",
+                "to": "sing-box",
+                "filter": [
+                    "sing-box.exe"
+                ]
+            }
         ],
         "win": {
             "signAndEditExecutable": false,
