@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-// Downloads the official sing-box Windows release into vendor/sing-box/ so
-// `npm run build:win` can bundle it into the installer (electron-builder
-// extraResources). Zero dependencies: uses global fetch + built-in tar.
+// Downloads the official sing-box release for the current platform and
+// architecture into vendor/sing-box/ so `npm run build` can bundle it into
+// the package (electron-builder extraResources). Zero dependencies: uses
+// global fetch + built-in tar.
 
 const fs = require("fs");
 const os = require("os");
@@ -12,6 +13,9 @@ const { execFileSync, execSync } = require("child_process");
 const GITHUB_API_LATEST =
     "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
 const USER_AGENT = "ytm-tunnel-desktop-build-script";
+
+const PLATFORMS = { win32: "windows", darwin: "darwin", linux: "linux" };
+const ARCHES = { x64: "amd64", arm64: "arm64" };
 
 function parseArgs(argv) {
     const args = { version: "", force: false, help: false };
@@ -40,11 +44,36 @@ function usage() {
             "Usage:",
             "  node ./scripts/download-singbox.js [--version <x.y.z>] [--force]",
             "",
-            "Downloads sing-box (windows-amd64) into vendor/sing-box/sing-box.exe.",
-            "Defaults to the latest GitHub release; skips if already downloaded",
-            "unless --force is given.",
+            "Downloads sing-box for the current platform and architecture into",
+            "vendor/sing-box/. Defaults to the latest GitHub release; skips if",
+            "already downloaded unless --force is given.",
         ].join("\n"),
     );
+}
+
+/** Map Node's platform/arch to sing-box release naming. Throws elsewhere. */
+function resolveTarget() {
+    const platform = PLATFORMS[process.platform];
+    const arch = ARCHES[process.arch];
+
+    if (!platform) {
+        throw new Error(
+            `Unsupported platform: ${process.platform}. sing-box releases cover windows, darwin, and linux.`,
+        );
+    }
+
+    if (!arch) {
+        throw new Error(
+            `Unsupported architecture: ${process.arch}. sing-box releases cover amd64 and arm64.`,
+        );
+    }
+
+    return {
+        platform,
+        arch,
+        exeName: platform === "windows" ? "sing-box.exe" : "sing-box",
+        archiveExt: platform === "windows" ? "zip" : "tar.gz",
+    };
 }
 
 function findFileRecursive(rootDir, fileName) {
@@ -99,19 +128,23 @@ async function resolveLatestVersion() {
     return tag;
 }
 
-function extractZip(zipPath, destDir) {
-    // Windows 10 1803+ ships tar.exe, which handles zip archives.
+function extractArchive(archivePath, destDir, isZip) {
+    // tar handles both zip and tar.gz on every supported platform
+    // (Windows 10 1803+ ships tar.exe).
     try {
-        execFileSync("tar", ["-xf", zipPath, "-C", destDir], {
+        execFileSync("tar", [isZip ? "-xf" : "-xzf", archivePath, "-C", destDir], {
             stdio: ["ignore", "ignore", "pipe"],
         });
         return;
-    } catch {
-        // Fall through to PowerShell.
+    } catch (error) {
+        if (!isZip || process.platform !== "win32") {
+            throw error;
+        }
+        // Fall through to PowerShell for zip on Windows.
     }
 
     execSync(
-        `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destDir}' -Force"`,
+        `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${destDir}' -Force"`,
         { stdio: ["ignore", "ignore", "inherit"] },
     );
 }
@@ -130,63 +163,69 @@ async function main() {
         );
     }
 
+    const { platform, arch, exeName, archiveExt } = resolveTarget();
     const vendorDir = path.join(__dirname, "..", "vendor", "sing-box");
-    const targetExe = path.join(vendorDir, "sing-box.exe");
+    const targetBin = path.join(vendorDir, exeName);
 
-    if (fs.existsSync(targetExe) && !args.force) {
-        console.log(`sing-box already vendored: ${targetExe}`);
+    if (fs.existsSync(targetBin) && !args.force) {
+        console.log(`sing-box already vendored: ${targetBin}`);
         console.log("Use --force to re-download.");
         return;
     }
 
     const version = args.version || (await resolveLatestVersion());
-    const zipName = `sing-box-${version}-windows-amd64.zip`;
-    const zipUrl = `https://github.com/SagerNet/sing-box/releases/download/v${version}/${zipName}`;
+    const archiveName = `sing-box-${version}-${platform}-${arch}.${archiveExt}`;
+    const archiveUrl = `https://github.com/SagerNet/sing-box/releases/download/v${version}/${archiveName}`;
 
     console.log(`sing-box version: ${version}`);
-    console.log(`Downloading: ${zipUrl}`);
+    console.log(`target: ${platform}-${arch}`);
+    console.log(`Downloading: ${archiveUrl}`);
 
-    const response = await fetch(zipUrl, {
+    const response = await fetch(archiveUrl, {
         redirect: "follow",
         headers: { "User-Agent": USER_AGENT },
     });
 
     if (!response.ok) {
         throw new Error(
-            `Download failed with HTTP ${response.status}: ${zipUrl}\n` +
+            `Download failed with HTTP ${response.status}: ${archiveUrl}\n` +
                 "Check the version number, or download manually from " +
-                "https://github.com/SagerNet/sing-box/releases and place sing-box.exe into vendor/sing-box/.",
+                `https://github.com/SagerNet/sing-box/releases and place ${exeName} into vendor/sing-box/.`,
         );
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ytm-singbox-"));
-    const zipPath = path.join(tmpDir, zipName);
+    const archivePath = path.join(tmpDir, archiveName);
     const extractDir = path.join(tmpDir, "extracted");
 
     try {
-        fs.writeFileSync(zipPath, buffer);
+        fs.writeFileSync(archivePath, buffer);
         console.log(
             `Downloaded ${(buffer.length / 1024 / 1024).toFixed(1)} MB, extracting…`,
         );
 
         fs.mkdirSync(extractDir, { recursive: true });
-        extractZip(zipPath, extractDir);
+        extractArchive(archivePath, extractDir, archiveExt === "zip");
 
-        const exePath = findFileRecursive(extractDir, "sing-box.exe");
-        if (!exePath) {
+        const binPath = findFileRecursive(extractDir, exeName);
+        if (!binPath) {
             throw new Error(
-                "sing-box.exe not found in the downloaded archive. " +
+                `${exeName} not found in the downloaded archive. ` +
                     "The release layout may have changed; download manually from " +
-                    "https://github.com/SagerNet/sing-box/releases and place sing-box.exe into vendor/sing-box/.",
+                    `https://github.com/SagerNet/sing-box/releases and place ${exeName} into vendor/sing-box/.`,
             );
         }
 
         fs.mkdirSync(vendorDir, { recursive: true });
-        fs.copyFileSync(exePath, targetExe);
+        fs.copyFileSync(binPath, targetBin);
 
-        console.log(`Vendored: ${targetExe}`);
+        if (process.platform !== "win32") {
+            fs.chmodSync(targetBin, 0o755);
+        }
+
+        console.log(`Vendored: ${targetBin}`);
     } finally {
         try {
             fs.rmSync(tmpDir, { recursive: true, force: true });

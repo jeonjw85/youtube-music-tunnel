@@ -37,21 +37,39 @@
                 "from": "vendor/sing-box",
                 "to": "sing-box",
                 "filter": [
-                    "sing-box.exe"
+                    "sing-box.exe",
+                    "sing-box"
                 ]
             }
         ],
         "win": {
-            "signAndEditExecutable": false,
             "target": [
                 {
                     "target": "nsis",
                     "arch": [
                         "x64"
                     ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
                 }
             ],
-            "artifactName": "${productName}-${version}-Setup-${arch}.${ext}"
+            "artifactName": "${productName}-${version}-${target}-${arch}.${ext}"
+        },
+        "mac": {
+            "target": [
+                "dmg",
+                "zip"
+            ]
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb"
+            ]
         },
         "nsis": {
             "oneClick": false,
