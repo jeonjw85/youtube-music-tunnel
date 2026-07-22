@@ -13,8 +13,8 @@
         "convert:wg": "node ./scripts/convert-wg-to-singbox.js",
         "vendor:singbox": "node ./scripts/download-singbox.js",
         "test:tunnel": "node ./scripts/test-tunnel.js",
-        "build": "npm run vendor:singbox && electron-builder",
-        "build:win": "npm run vendor:singbox && electron-builder --win nsis"
+        "build": "npm run vendor:singbox && electron-builder --publish never",
+        "build:win": "npm run vendor:singbox && electron-builder --win nsis --publish never"
     },
     "build": {
         "appId": "com.example.ytmtunneldesktop",
