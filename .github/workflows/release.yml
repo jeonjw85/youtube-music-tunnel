@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest # Windows x64
+          - os: macos-13 # macOS Intel x64
+          - os: macos-14 # macOS Apple Silicon arm64
+          - os: ubuntu-latest # Linux x64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # package-lock.json is gitignored, so use install (not ci).
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        # CSC_IDENTITY_AUTO_DISCOVERY=false keeps the macOS build from
+        # hunting for a signing identity; the dmg/zip ship unsigned.
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
