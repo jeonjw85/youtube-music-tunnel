@@ -36,8 +36,11 @@ jobs:
       - name: Build
         # CSC_IDENTITY_AUTO_DISCOVERY=false keeps the macOS build from
         # hunting for a signing identity; the dmg/zip ship unsigned.
+        # GITHUB_TOKEN lifts the 60-req/hour unauthenticated GitHub API
+        # limit that download-singbox.js hits when resolving the release.
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build
 
       - name: Upload build artifacts

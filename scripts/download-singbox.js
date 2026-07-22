@@ -14,6 +14,13 @@ const GITHUB_API_LATEST =
     "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
 const USER_AGENT = "ytm-tunnel-desktop-build-script";
 
+/** Attach a bearer token when one is available (e.g. GITHUB_TOKEN in CI),
+ *  lifting the unauthenticated 60-req/hour GitHub API limit. */
+function withAuth(headers) {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+}
+
 const PLATFORMS = { win32: "windows", darwin: "darwin", linux: "linux" };
 const ARCHES = { x64: "amd64", arm64: "arm64" };
 
@@ -105,10 +112,10 @@ function findFileRecursive(rootDir, fileName) {
 
 async function resolveLatestVersion() {
     const response = await fetch(GITHUB_API_LATEST, {
-        headers: {
+        headers: withAuth({
             "User-Agent": USER_AGENT,
             Accept: "application/vnd.github+json",
-        },
+        }),
     });
 
     if (!response.ok) {
@@ -183,7 +190,7 @@ async function main() {
 
     const response = await fetch(archiveUrl, {
         redirect: "follow",
-        headers: { "User-Agent": USER_AGENT },
+        headers: withAuth({ "User-Agent": USER_AGENT }),
     });
 
     if (!response.ok) {
