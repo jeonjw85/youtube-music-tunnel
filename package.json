@@ -30,6 +30,7 @@
             "preload.js",
             "preload-eq.js",
             "eq.html",
+            "assets",
             "package.json"
         ],
         "extraResources": [
@@ -43,6 +44,7 @@
             }
         ],
         "win": {
+            "icon": "assets/icon.ico",
             "target": [
                 {
                     "target": "nsis",
@@ -60,12 +62,14 @@
             "artifactName": "${productName}-${version}-${target}-${arch}.${ext}"
         },
         "mac": {
+            "icon": "assets/icon.icns",
             "target": [
                 "dmg",
                 "zip"
             ]
         },
         "linux": {
+            "icon": "assets/icon.png",
             "target": [
                 "AppImage",
                 "deb"

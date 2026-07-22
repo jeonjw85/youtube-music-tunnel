@@ -23,6 +23,8 @@ const RESET_CONFIG =
     process.env.YTM_RESET_CONFIG === "true" ||
     process.env.YTM_RESET_CONFIG === "1";
 
+const ICON_PATH = path.join(__dirname, "assets", "icon.png");
+
 // Resolve the tunnel config up front so the proxy switch decision is made
 // synchronously at module load (command-line switches must be appended
 // before app "ready"). First-run onboarding happens after "ready".
@@ -294,6 +296,7 @@ function createMainWindow() {
         show: !START_HIDDEN,
         autoHideMenuBar: true,
         title: "YouTube Music",
+        icon: ICON_PATH,
         backgroundColor: "#111111",
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
@@ -428,6 +431,11 @@ function createMainWindow() {
 }
 
 function getTrayIcon() {
+    const bundled = nativeImage.createFromPath(ICON_PATH);
+    if (!bundled.isEmpty()) {
+        return bundled.resize({ width: 16, height: 16 });
+    }
+
     const exeIcon = nativeImage.createFromPath(process.execPath);
     if (!exeIcon.isEmpty()) {
         return exeIcon.resize({ width: 16, height: 16 });
