@@ -69,7 +69,7 @@ On first launch, pick your WireGuard `.conf` file when prompted — the app conv
 - Dev: `./sing-box/config.json` (repo-local, gitignored).
 - Installed app: `%APPDATA%\YTM Tunnel Desktop\sing-box\config.json`.
 
-The app generates this file from the `.conf` you pick on first launch. To switch configs or providers, set `YTM_RESET_CONFIG=true` once and launch the app — the first-run picker appears again.
+The app generates this file from the `.conf` you pick on first launch. To switch configs or providers, open **Settings** from the tray (or `Ctrl+,`) and import a new WireGuard `.conf` file. You can also set `YTM_RESET_CONFIG=true` once to show the first-run picker again.
 
 `sing-box` output is logged next to the config in dev, and to `%APPDATA%\YTM Tunnel Desktop\logs\` in the installed app.
 
@@ -98,19 +98,22 @@ npm run test:tunnel
 
 ## Environment Variables
 
+App settings (tunnel on/off, minimize to tray, start hidden) are stored in `settings.json` next to the tunnel config in the installed app, or `./settings.json` in development. The Settings window is the normal way to change them. Environment variables still override for a single launch:
+
 - `YTM_USE_PROXY`
-  - `true` or unset: enable the app-local tunnel.
+  - unset: use the value from Settings (default on).
   - `false`: disable the tunnel.
 - `YTM_PROXY`
   - Proxy URL used by Electron.
   - Default: `socks5://127.0.0.1:1080`
-  - When generating a config (first run or reset), the SOCKS5 listener is created on this port.
+  - When generating a config (first run, reset, or Settings import), the SOCKS5 listener is created on this port.
 - `YTM_RESET_CONFIG`
   - `true`: show the first-run `.conf` picker again and overwrite the existing tunnel config.
 - `YTM_MINIMIZE_TO_TRAY`
+  - unset: use the value from Settings (default off).
   - `true`: closing the window hides it to the tray.
-  - unset/other: closing behaves normally.
 - `YTM_START_HIDDEN`
+  - unset: use the value from Settings (default off).
   - `true`: start hidden and rely on the tray.
 
 ## App Controls
@@ -120,12 +123,14 @@ npm run test:tunnel
   - Next track
   - Previous track
 - `Ctrl+E`: open the equalizer window.
+- `Ctrl+,`: open Settings.
 - Tray menu:
   - Show
   - Play/Pause
   - Next
   - Previous
   - Equalizer
+  - Settings
   - Quit
 
 Non-YouTube-Music links are opened in the external browser.

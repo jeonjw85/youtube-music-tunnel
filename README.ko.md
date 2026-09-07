@@ -69,7 +69,7 @@ npm start
 - 개발 환경: `./sing-box/config.json`, 저장소 로컬 파일이며 git에서 무시됨
 - 설치본: `%APPDATA%\YTM Tunnel Desktop\sing-box\config.json`
 
-첫 실행 때 고른 `.conf`로 앱이 직접 생성합니다. 설정이나 공급자를 바꾸려면 `YTM_RESET_CONFIG=true`로 한 번 실행하면 선택 창이 다시 뜹니다.
+첫 실행 때 고른 `.conf`로 앱이 직접 생성합니다. 설정이나 공급자를 바꾸려면 트레이의 **Settings**(또는 `Ctrl+,`)에서 WireGuard `.conf`를 다시 고르면 됩니다. `YTM_RESET_CONFIG=true`로 한 번 실행하면 첫 실행 선택 창이 다시 뜹니다.
 
 로그는 개발 환경에서 설정 파일 옆에, 설치본에서는 `%APPDATA%\YTM Tunnel Desktop\logs\`에 남습니다.
 
@@ -98,17 +98,20 @@ npm run test:tunnel
 
 ## 환경 변수
 
-- `YTM_USE_PROXY`: `true` 또는 미설정 시 앱 자체 터널 사용, `false` 시 터널 끔
+터널 on/off, 트레이로 최소화, 숨김 시작은 Settings 창에서 바꾸고 `settings.json`에 저장됩니다. 설치본은 터널 설정과 같은 폴더, 개발 환경은 `./settings.json`입니다. 환경 변수는 한 번 실행에 한해 이 값을 덮어씁니다.
+
+- `YTM_USE_PROXY`: 미설정 시 Settings 값(기본 켜짐), `false` 시 터널 끔
 - `YTM_PROXY`: Electron이 쓰는 프록시 URL, 기본값 `socks5://127.0.0.1:1080`. 설정 생성 시 SOCKS5 리스너가 이 포트로 생김
 - `YTM_RESET_CONFIG`: `true` 시 첫 실행 선택 창을 다시 띄우고 기존 설정을 덮어씀
-- `YTM_MINIMIZE_TO_TRAY`: `true` 시 창을 닫으면 트레이로 들어감
-- `YTM_START_HIDDEN`: `true` 시 숨김 상태로 시작
+- `YTM_MINIMIZE_TO_TRAY`: 미설정 시 Settings 값(기본 꺼짐), `true` 시 창을 닫으면 트레이로 들어감
+- `YTM_START_HIDDEN`: 미설정 시 Settings 값(기본 꺼짐), `true` 시 숨김 상태로 시작
 
 ## 앱 조작
 
 - 미디어 키: 재생/일시정지, 다음 트랙, 이전 트랙
 - `Ctrl+E`: 이퀄라이저 창
-- 트레이 메뉴: 보이기, 재생/일시정지, 다음, 이전, 이퀄라이저, 종료
+- `Ctrl+,`: Settings
+- 트레이 메뉴: 보이기, 재생/일시정지, 다음, 이전, 이퀄라이저, Settings, 종료
 
 YouTube Music 외부 링크는 기본 브라우저에서 열립니다.
 
