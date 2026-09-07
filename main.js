@@ -13,12 +13,14 @@ const fs = require("fs");
 const path = require("path");
 
 const tunnel = require("./singbox");
+const settingsStore = require("./settings");
 
 const YTM_URL = "https://music.youtube.com/";
 const PROXY = process.env.YTM_PROXY || "socks5://127.0.0.1:1080";
-const USE_PROXY = process.env.YTM_USE_PROXY !== "false";
-const MINIMIZE_TO_TRAY = process.env.YTM_MINIMIZE_TO_TRAY === "true";
-const START_HIDDEN = process.env.YTM_START_HIDDEN === "true";
+const runtimeSettings = settingsStore.resolveRuntimeSettings();
+let USE_PROXY = runtimeSettings.useProxy;
+let MINIMIZE_TO_TRAY = runtimeSettings.minimizeToTray;
+let START_HIDDEN = runtimeSettings.startHidden;
 const RESET_CONFIG =
     process.env.YTM_RESET_CONFIG === "true" ||
     process.env.YTM_RESET_CONFIG === "1";
@@ -40,6 +42,7 @@ if (USE_PROXY && tunnelConfigured && PROXY) {
 let mainWindow = null;
 let tray = null;
 let eqWindow = null;
+let settingsWindow = null;
 let isQuitting = false;
 let hasShownProxyError = false;
 // 10-band
@@ -100,6 +103,10 @@ ipcMain.on("eq:set-gains", (_event, gains) => {
 
 ipcMain.handle("eq:get-gains", () => eqGains);
 
+ipcMain.handle("settings:get", () => getSettingsView());
+ipcMain.handle("settings:set", (_event, patch) => applySettingsPatch(patch));
+ipcMain.handle("settings:import-wg", () => importWireGuardFromDialog());
+
 function openEqWindow() {
     if (eqWindow && !eqWindow.isDestroyed()) {
         eqWindow.focus();
@@ -130,6 +137,36 @@ function openEqWindow() {
     });
 }
 
+function openSettingsWindow() {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+        settingsWindow.focus();
+        return;
+    }
+
+    settingsWindow = new BrowserWindow({
+        width: 400,
+        height: 420,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        title: "Settings",
+        backgroundColor: "#111111",
+        parent: mainWindow || undefined,
+        webPreferences: {
+            preload: path.join(__dirname, "preload-settings.js"),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+        },
+    });
+
+    settingsWindow.removeMenu();
+    settingsWindow.loadFile("settings.html");
+    settingsWindow.on("closed", () => {
+        settingsWindow = null;
+    });
+}
+
 function relaunchWithoutProxy() {
     // Relaunch with proxy explicitly disabled so command-line proxy switch is not applied.
     const env = {
@@ -140,6 +177,138 @@ function relaunchWithoutProxy() {
     app.relaunch({ env });
     isQuitting = true;
     app.quit();
+}
+
+function relaunchApplyingSettings() {
+    const env = { ...process.env };
+    delete env.YTM_USE_PROXY;
+    delete env.YTM_MINIMIZE_TO_TRAY;
+    delete env.YTM_START_HIDDEN;
+
+    app.relaunch({ env });
+    isQuitting = true;
+    app.quit();
+}
+
+function getSettingsView() {
+    const summary = tunnel.readTunnelSummary(CONFIG_PATH);
+    const proxyTarget = tunnel.parseProxyUrl(PROXY);
+    const listenPort = summary.listenPort || proxyTarget.port;
+
+    return {
+        useProxy: USE_PROXY,
+        minimizeToTray: MINIMIZE_TO_TRAY,
+        startHidden: START_HIDDEN,
+        configured: summary.configured,
+        endpoint: summary.endpoint,
+        listen: `${summary.listenHost || proxyTarget.host}:${listenPort}`,
+    };
+}
+
+function applySettingsPatch(patch) {
+    if (!patch || typeof patch !== "object") {
+        return getSettingsView();
+    }
+
+    const saved = settingsStore.saveSettings(patch);
+
+    if (typeof patch.minimizeToTray === "boolean") {
+        MINIMIZE_TO_TRAY = saved.minimizeToTray;
+        if (!tray) {
+            createTray();
+        }
+    }
+
+    if (typeof patch.startHidden === "boolean") {
+        START_HIDDEN = saved.startHidden;
+    }
+
+    if (typeof patch.useProxy === "boolean" && saved.useProxy !== USE_PROXY) {
+        relaunchApplyingSettings();
+        return {
+            ...getSettingsView(),
+            useProxy: saved.useProxy,
+            relaunching: true,
+        };
+    }
+
+    return getSettingsView();
+}
+
+async function importWireGuardFromDialog() {
+    const parent =
+        settingsWindow && !settingsWindow.isDestroyed()
+            ? settingsWindow
+            : mainWindow;
+
+    const openOpts = {
+        title: "Select WireGuard configuration",
+        properties: ["openFile"],
+        filters: [
+            { name: "WireGuard config", extensions: ["conf"] },
+            { name: "All files", extensions: ["*"] },
+        ],
+    };
+    const picked = parent
+        ? await dialog.showOpenDialog(parent, openOpts)
+        : await dialog.showOpenDialog(openOpts);
+
+    if (picked.canceled || picked.filePaths.length === 0) {
+        return { canceled: true };
+    }
+
+    const confPath = picked.filePaths[0];
+    const proxyTarget = tunnel.parseProxyUrl(PROXY);
+
+    try {
+        tunnel.convertWgFile(confPath, CONFIG_PATH, {
+            listenHost: proxyTarget.host,
+            listenPort: proxyTarget.port,
+        });
+    } catch (error) {
+        await dialog.showMessageBox({
+            type: "error",
+            title: "Conversion failed",
+            message: `Could not convert ${path.basename(confPath)}`,
+            detail: error.message,
+            buttons: ["OK"],
+        });
+        return { ok: false, error: error.message };
+    }
+
+    if (USE_PROXY && tunnelConfigured) {
+        tunnel.stopTunnel();
+        const exePath = tunnel.resolveSingBoxExe();
+        if (exePath) {
+            try {
+                await tunnel.startTunnel({
+                    configPath: CONFIG_PATH,
+                    exePath,
+                    proxyUrl: PROXY,
+                });
+            } catch (error) {
+                await dialog.showMessageBox({
+                    type: "error",
+                    title: "Tunnel failed to start",
+                    message: "sing-box could not start the tunnel",
+                    detail: error.message,
+                    buttons: ["OK"],
+                });
+                return { ok: false, error: error.message };
+            }
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.reload();
+        }
+        return getSettingsView();
+    }
+
+    if (USE_PROXY) {
+        relaunchApplyingSettings();
+        return { ...getSettingsView(), relaunching: true };
+    }
+
+    return getSettingsView();
 }
 
 /**
@@ -513,6 +682,7 @@ function registerMediaKeys() {
 
     // Open EQ window with Ctrl+E
     globalShortcut.register("CommandOrControl+E", openEqWindow);
+    globalShortcut.register("CommandOrControl+,", openSettingsWindow);
 }
 
 function createTray() {
@@ -563,6 +733,10 @@ function createTray() {
         {
             label: "Equalizer",
             click: openEqWindow,
+        },
+        {
+            label: "Settings",
+            click: openSettingsWindow,
         },
         {
             type: "separator",
@@ -627,12 +801,10 @@ app.whenReady().then(async () => {
     }
 
     createMainWindow();
-    if (MINIMIZE_TO_TRAY) {
-        createTray();
-    }
+    createTray();
     registerMediaKeys();
 
-    if (START_HIDDEN && MINIMIZE_TO_TRAY && mainWindow) {
+    if (START_HIDDEN && mainWindow) {
         mainWindow.hide();
     }
 });

@@ -27,9 +27,12 @@
             "main.js",
             "singbox.js",
             "wg-convert.js",
+            "settings.js",
             "preload.js",
             "preload-eq.js",
+            "preload-settings.js",
             "eq.html",
+            "settings.html",
             "assets",
             "package.json"
         ],

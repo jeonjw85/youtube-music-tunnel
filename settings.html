@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+        />
+        <title>Settings</title>
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background: #111;
+                color: #eee;
+                font-family: "Segoe UI", system-ui, sans-serif;
+                font-size: 12px;
+                user-select: none;
+                padding: 16px 16px 14px;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            h1 {
+                font-size: 13px;
+                font-weight: 600;
+                color: #fff;
+                letter-spacing: 0.05em;
+                text-align: center;
+            }
+
+            section {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            h2 {
+                font-size: 11px;
+                font-weight: 600;
+                color: #888;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+
+            .row {
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                gap: 12px;
+                min-height: 18px;
+            }
+
+            .k {
+                color: #888;
+            }
+
+            .v {
+                color: #eee;
+                font-variant-numeric: tabular-nums;
+                text-align: right;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .hint {
+                color: #666;
+                font-size: 11px;
+                line-height: 1.4;
+            }
+
+            .status {
+                color: #aaa;
+                font-size: 11px;
+                min-height: 16px;
+            }
+
+            .status.error {
+                color: #e66;
+            }
+
+            label.check {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: #ddd;
+                cursor: pointer;
+            }
+
+            input[type="checkbox"] {
+                accent-color: #c00;
+                cursor: pointer;
+            }
+
+            button {
+                background: #222;
+                color: #ccc;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 5px 12px;
+                font-size: 11px;
+                cursor: pointer;
+                width: fit-content;
+                transition: background 0.15s;
+            }
+
+            button:hover {
+                background: #333;
+                color: #fff;
+            }
+
+            button:disabled {
+                opacity: 0.5;
+                cursor: default;
+            }
+
+            button.primary {
+                background: #c00;
+                border-color: #900;
+                color: #fff;
+            }
+
+            button.primary:hover {
+                background: #e00;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Settings</h1>
+
+        <section>
+            <h2>Tunnel</h2>
+            <div class="row">
+                <span class="k">Endpoint</span>
+                <span class="v" id="endpoint">—</span>
+            </div>
+            <div class="row">
+                <span class="k">SOCKS5</span>
+                <span class="v" id="listen">—</span>
+            </div>
+            <button class="primary" id="import">
+                Import WireGuard .conf…
+            </button>
+            <label class="check">
+                <input type="checkbox" id="useProxy" />
+                Use tunnel
+            </label>
+            <p class="hint">Changing the tunnel on/off restarts the app.</p>
+        </section>
+
+        <section>
+            <h2>App</h2>
+            <label class="check">
+                <input type="checkbox" id="minimizeToTray" />
+                Minimize to tray
+            </label>
+            <label class="check">
+                <input type="checkbox" id="startHidden" />
+                Start hidden in tray
+            </label>
+        </section>
+
+        <p class="status" id="status"></p>
+
+        <script>
+            const endpointEl = document.getElementById("endpoint");
+            const listenEl = document.getElementById("listen");
+            const useProxyEl = document.getElementById("useProxy");
+            const minimizeEl = document.getElementById("minimizeToTray");
+            const hiddenEl = document.getElementById("startHidden");
+            const importEl = document.getElementById("import");
+            const statusEl = document.getElementById("status");
+
+            function setStatus(text, isError) {
+                statusEl.textContent = text || "";
+                statusEl.classList.toggle("error", Boolean(isError));
+            }
+
+            function applyView(view) {
+                endpointEl.textContent = view.endpoint || "Not configured";
+                listenEl.textContent = view.listen || "—";
+                useProxyEl.checked = Boolean(view.useProxy);
+                minimizeEl.checked = Boolean(view.minimizeToTray);
+                hiddenEl.checked = Boolean(view.startHidden);
+            }
+
+            async function refresh() {
+                const view = await window.settingsBridge.get();
+                applyView(view);
+                return view;
+            }
+
+            importEl.addEventListener("click", async () => {
+                importEl.disabled = true;
+                setStatus("");
+                try {
+                    const result = await window.settingsBridge.importWg();
+                    if (result && result.canceled) {
+                        return;
+                    }
+                    if (result && result.ok === false) {
+                        setStatus(result.error || "Import failed", true);
+                        return;
+                    }
+                    if (result && result.relaunching) {
+                        setStatus("Restarting…");
+                        return;
+                    }
+                    applyView(result);
+                    setStatus("Tunnel config updated.");
+                } catch (error) {
+                    setStatus(error.message || "Import failed", true);
+                } finally {
+                    importEl.disabled = false;
+                }
+            });
+
+            useProxyEl.addEventListener("change", async () => {
+                setStatus("Restarting…");
+                await window.settingsBridge.set({
+                    useProxy: useProxyEl.checked,
+                });
+            });
+
+            minimizeEl.addEventListener("change", async () => {
+                const view = await window.settingsBridge.set({
+                    minimizeToTray: minimizeEl.checked,
+                });
+                applyView(view);
+            });
+
+            hiddenEl.addEventListener("change", async () => {
+                const view = await window.settingsBridge.set({
+                    startHidden: hiddenEl.checked,
+                });
+                applyView(view);
+            });
+
+            refresh().catch((error) => {
+                setStatus(error.message || "Could not load settings", true);
+            });
+        </script>
+    </body>
+</html>
