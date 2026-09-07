@@ -170,14 +170,46 @@ function parseProxyUrl(proxyUrl) {
 
 /** Read the SOCKS5 inbound port from an existing sing-box config. */
 function readConfigListenPort(configPath) {
+    const summary = readTunnelSummary(configPath);
+    return summary.listenPort;
+}
+
+/**
+ * Public (non-secret) summary of the tunnel config for the Settings UI.
+ * Never includes private keys or preshared keys.
+ */
+function readTunnelSummary(configPath) {
     try {
         const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
         const inbound = (config.inbounds || []).find(
             (entry) => entry && entry.type === "socks",
         );
-        return inbound ? Number(inbound.listen_port) : null;
+        const endpoint = (config.endpoints || [])[0];
+        const peer =
+            endpoint && Array.isArray(endpoint.peers)
+                ? endpoint.peers[0]
+                : null;
+
+        let peerEndpoint = null;
+        if (peer && peer.address) {
+            peerEndpoint = peer.port
+                ? `${peer.address}:${peer.port}`
+                : String(peer.address);
+        }
+
+        return {
+            configured: true,
+            endpoint: peerEndpoint,
+            listenHost: inbound && inbound.listen ? inbound.listen : "127.0.0.1",
+            listenPort: inbound ? Number(inbound.listen_port) : null,
+        };
     } catch {
-        return null;
+        return {
+            configured: false,
+            endpoint: null,
+            listenHost: null,
+            listenPort: null,
+        };
     }
 }
 
@@ -396,6 +428,7 @@ module.exports = {
     resolveSingBoxExe,
     parseProxyUrl,
     convertWgFile,
+    readTunnelSummary,
     startTunnel,
     stopTunnel,
     scrubSecrets,
