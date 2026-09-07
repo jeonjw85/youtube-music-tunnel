@@ -34,8 +34,8 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Build
-        # CSC_IDENTITY_AUTO_DISCOVERY=false keeps the macOS build from
-        # hunting for a signing identity; the dmg/zip ship unsigned.
+        # CSC_IDENTITY_AUTO_DISCOVERY=false skips Developer ID lookup.
+        # mac.identity is null; afterPack ad-hoc signs the assembled app.
         # GITHUB_TOKEN lifts the 60-req/hour unauthenticated GitHub API
         # limit that download-singbox.js hits when resolving the release.
         env:
