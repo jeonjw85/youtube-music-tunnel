@@ -153,6 +153,10 @@ The Windows build uses `electron-builder` with an NSIS installer target.
 
 ## Troubleshooting
 
+### macOS: "YTM Tunnel Desktop is damaged"
+
+The GitHub download is ad-hoc signed, not Developer ID notarized. Gatekeeper should offer **System Settings → Privacy & Security → Open Anyway**, not "damaged". If you still see "damaged", the file was likely cached from an older unsigned build — re-download the `.dmg` from the latest release.
+
 ### "Tunnel failed to start" dialog
 
 The dialog shows `sing-box`'s error output. Common causes:

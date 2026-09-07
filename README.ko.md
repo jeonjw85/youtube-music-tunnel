@@ -127,6 +127,10 @@ npm run build:win
 
 ## 문제 해결
 
+### macOS: "YTM Tunnel Desktop이(가) 손상되었습니다"
+
+GitHub 빌드는 Developer ID 공증이 아니라 ad-hoc 서명입니다. Gatekeeper는 **손상됨** 대신 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**를 띄워야 합니다. 여전히 손상됨이면 예전 미서명 빌드가 캐시된 것이니 최신 릴리스 `.dmg`를 다시 받으세요.
+
 ### "Tunnel failed to start" 대화상자
 
 대화상자에 `sing-box` 오류 출력이 함께 표시됩니다. 흔한 원인:
