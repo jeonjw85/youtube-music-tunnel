@@ -20,6 +20,7 @@
         "appId": "com.example.ytmtunneldesktop",
         "productName": "YTM Tunnel Desktop",
         "asar": true,
+        "afterPack": "./scripts/mac-adhoc-sign.js",
         "directories": {
             "output": "dist"
         },
@@ -64,6 +65,7 @@
             ]
         },
         "mac": {
+            "identity": null,
             "icon": "assets/icon.icns",
             "artifactName": "${productName}-${version}-${arch}.${ext}",
             "target": [
