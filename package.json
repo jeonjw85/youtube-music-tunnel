@@ -1,6 +1,6 @@
 {
     "name": "ytm-tunnel-desktop",
-    "version": "0.1.3",
+    "version": "0.2.0",
     "description": "Dedicated YouTube Music desktop client with app-local SOCKS5 proxy",
     "main": "main.js",
     "author": "Jeongwan Jeon <jjw@jjw.kr>",
