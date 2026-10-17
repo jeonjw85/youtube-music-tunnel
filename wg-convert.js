@@ -20,8 +20,8 @@ function stripComment(line) {
 
 function parseWireGuardConfig(text) {
     const result = {
-        Interface: {},
-        Peer: {},
+        Interface: Object.create(null),
+        Peer: Object.create(null),
     };
 
     let section = "";
@@ -34,7 +34,8 @@ function parseWireGuardConfig(text) {
         }
 
         if (line.startsWith("[") && line.endsWith("]")) {
-            section = line.slice(1, -1).trim();
+            const name = line.slice(1, -1).trim();
+            section = name === "Interface" || name === "Peer" ? name : "";
             continue;
         }
 
@@ -45,10 +46,6 @@ function parseWireGuardConfig(text) {
 
         const key = line.slice(0, eq).trim();
         const value = line.slice(eq + 1).trim();
-
-        if (!result[section]) {
-            result[section] = {};
-        }
 
         result[section][key] = value;
     }
