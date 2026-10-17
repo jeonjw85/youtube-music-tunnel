@@ -440,16 +440,28 @@ if (!app.requestSingleInstanceLock()) {
 
 function isAllowedNavigation(urlString) {
     try {
-        const { hostname } = new URL(urlString);
+        const { hostname, protocol } = new URL(urlString);
         return (
-            hostname === "music.youtube.com" ||
-            hostname.endsWith(".youtube.com") ||
-            hostname.endsWith(".google.com") ||
-            hostname.endsWith(".gstatic.com")
+            protocol === "https:" &&
+            (hostname === "music.youtube.com" ||
+                hostname.endsWith(".youtube.com") ||
+                hostname.endsWith(".google.com") ||
+                hostname.endsWith(".gstatic.com"))
         );
     } catch {
         return false;
     }
+}
+
+function openExternalLink(urlString) {
+    try {
+        const { protocol } = new URL(urlString);
+        if (protocol !== "https:" && protocol !== "http:") return;
+    } catch {
+        return;
+    }
+
+    shell.openExternal(urlString);
 }
 
 function createMainWindow() {
@@ -481,16 +493,20 @@ function createMainWindow() {
             return { action: "allow" };
         }
 
-        shell.openExternal(url);
+        openExternalLink(url);
         return { action: "deny" };
     });
 
-    mainWindow.webContents.on("will-navigate", (event, url) => {
+    const handleNavigation = (event, url) => {
+        if (!event.isMainFrame) return;
+
         if (!isAllowedNavigation(url)) {
             event.preventDefault();
-            shell.openExternal(url);
+            openExternalLink(url);
         }
-    });
+    };
+    mainWindow.webContents.on("will-navigate", handleNavigation);
+    mainWindow.webContents.on("will-redirect", handleNavigation);
 
     mainWindow.loadURL(YTM_URL);
 
