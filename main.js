@@ -169,23 +169,19 @@ function openSettingsWindow() {
 
 function relaunchWithoutProxy() {
     // Relaunch with proxy explicitly disabled so command-line proxy switch is not applied.
-    const env = {
-        ...process.env,
-        YTM_USE_PROXY: "false",
-    };
+    process.env.YTM_USE_PROXY = "false";
 
-    app.relaunch({ env });
+    app.relaunch();
     isQuitting = true;
     app.quit();
 }
 
 function relaunchApplyingSettings() {
-    const env = { ...process.env };
-    delete env.YTM_USE_PROXY;
-    delete env.YTM_MINIMIZE_TO_TRAY;
-    delete env.YTM_START_HIDDEN;
+    delete process.env.YTM_USE_PROXY;
+    delete process.env.YTM_MINIMIZE_TO_TRAY;
+    delete process.env.YTM_START_HIDDEN;
 
-    app.relaunch({ env });
+    app.relaunch();
     isQuitting = true;
     app.quit();
 }
