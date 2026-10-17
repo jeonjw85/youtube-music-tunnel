@@ -258,7 +258,12 @@ function waitForPortOrExit(child, host, port, timeoutMs, stderrLogPath) {
             }
             settled = true;
             child.removeListener("exit", onExit);
+            child.removeListener("error", onError);
             fn(value);
+        };
+
+        const onError = (error) => {
+            settle(reject, error);
         };
 
         const onExit = (code, signal) => {
@@ -273,6 +278,7 @@ function waitForPortOrExit(child, host, port, timeoutMs, stderrLogPath) {
         };
 
         child.once("exit", onExit);
+        child.once("error", onError);
 
         const attempt = () => {
             if (settled) {
